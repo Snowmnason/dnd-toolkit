@@ -1,83 +1,105 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AnalyticsConsent, ConsentLevel } from '@/lib/analytics/consent/consent';
-import { SecureStorage } from '@/system/Storage';
+import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
+import { Analytics } from '@/managers/analytics/analytics-manager';
+import { STORAGE_KEYS } from '@/maps';
+import { loadAnalyticsQueue, loadAnalyticsQueueJSON, persistAnalyticsQueue, persistAnalyticsQueueJSON } from '@/middleware/storage';
+import { currentConsentLevel, setCurrentConsentLevel } from '@/type-definitions/analytics-types';
 
-// Mock SecureStorage from @/system/Storage
-vi.mock('@/system/Storage', () => {
+vi.mock('@/lib/utils', () => {
+  const loggerMock = {
+    category: vi.fn(() => ({
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      analytics: vi.fn(),
+      perf: vi.fn(),
+      batch: vi.fn(),
+    })),
+  };
+
   return {
-    SecureStorage: {
-      getItem: vi.fn(),
-      setItem: vi.fn(),
-      getJSON: vi.fn(),
-      setJSON: vi.fn(),
-      removeItem: vi.fn(),
-    },
-    STORAGE_KEYS: { ANALYTICS_CONSENT: 'dnd:analytics:consent', ANALYTICS_CONSENT_META: 'dnd:analytics:consent_meta' },
+    logger: loggerMock,
+    default: loggerMock,
   };
 });
 
+vi.mock('@/middleware/storage', () => ({
+  loadAnalyticsQueue: vi.fn(),
+  loadAnalyticsQueueJSON: vi.fn(),
+  persistAnalyticsQueue: vi.fn(),
+  persistAnalyticsQueueJSON: vi.fn(),
+  clearAnalyticsQueue: vi.fn(),
+}));
+
+vi.mock('@/lib/database', () => ({
+  isDatabaseConfigured: vi.fn(() => false),
+  userSettingsDB: {
+    fetchCurrentUserSettings: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/analytics/consent/consent-sync-queue', () => ({
+  ConsentSyncQueue: {
+    enqueue: vi.fn(async () => 'sync-id'),
+  },
+}));
+
+vi.mock('@/lib/error', () => ({
+  clearErrorUser: vi.fn(),
+  isTrackingEnabled: vi.fn(() => true),
+  setErrorUser: vi.fn(),
+}));
+
+vi.mock('@/lib/analytics/exporters/analytics-buffer', () => ({
+  analyticsBufferService: {
+    enqueue: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/analytics/utils', () => ({
+  getThreshold: vi.fn(() => 3000),
+  sanitizeError: vi.fn(),
+}));
+
 describe('AnalyticsConsent (unit)', () => {
   beforeEach(() => {
-    // Reset mocks and in-memory state
-    vi.resetAllMocks();
+    vi.clearAllMocks();
     AnalyticsConsent.resetToDefault();
+    setCurrentConsentLevel('basic');
   });
 
-  it('reads stored consent via getStoredConsent', async () => {
-    const mockLevel: ConsentLevel = 'full';
-    const spyGet = vi.spyOn(SecureStorage, 'getItem' as any).mockResolvedValueOnce(mockLevel as any);
-
-    const stored = await AnalyticsConsent.getStoredConsent();
-    expect(spyGet).toHaveBeenCalled();
-    expect(stored).toBe(mockLevel);
-  });
-
-  it('falls back to default when storage missing or invalid', async () => {
-    (SecureStorage.getItem as any).mockResolvedValueOnce(undefined);
-    (SecureStorage.getJSON as any).mockResolvedValueOnce(undefined);
+  it('falls back to the default level when storage is empty', async () => {
+    vi.mocked(loadAnalyticsQueue).mockResolvedValueOnce(null);
+    vi.mocked(loadAnalyticsQueueJSON).mockResolvedValueOnce(null);
 
     const level = await AnalyticsConsent.initialize();
+
     expect(level).toBe('basic');
     expect(AnalyticsConsent.getLevel()).toBe('basic');
+    expect(currentConsentLevel).toBe('basic');
   });
 
-  it('setLevel persists to SecureStorage and updates in-memory', async () => {
-    // implement a small in-memory fake storage so set/get interplay can be verified
-    const store: Record<string, any> = {};
-    vi.spyOn(SecureStorage, 'setItem' as any).mockImplementation((...args: any[]) => {
-      const key = args[0] as string;
-      const value = args[1];
-      // eslint-disable-next-line security/detect-object-injection
-      store[key] = value;
-      return Promise.resolve();
-    });
-    vi.spyOn(SecureStorage, 'getItem' as any).mockImplementation((...args: any[]) => {
-      const key = args[0] as string;
-      // eslint-disable-next-line security/detect-object-injection
-      return Promise.resolve(store[key]);
-    });
+  it('persists consent through the manager and keeps the global level in sync', async () => {
+    await Analytics.updateConsentLevel('full');
 
-    await AnalyticsConsent.setLevel('full');
     expect(AnalyticsConsent.getLevel()).toBe('full');
-
-    const persisted = await AnalyticsConsent.getStoredConsent();
-    expect(persisted).toBe('full');
+    expect(currentConsentLevel).toBe('full');
+    expect(persistAnalyticsQueue).toHaveBeenCalledWith(STORAGE_KEYS.ANALYTICS_CONSENT, 'full');
+    expect(persistAnalyticsQueueJSON).toHaveBeenCalledWith(STORAGE_KEYS.ANALYTICS_CONSENT_META, {
+      timestamp: expect.any(Number),
+      source: 'user',
+    });
   });
 
-  it('isAllowed respects consent levels', async () => {
-    AnalyticsConsent.resetToDefault();
-    expect(AnalyticsConsent.getLevel()).toBe('basic');
-    expect(AnalyticsConsent.isAllowed('essential')).toBe(true);
-    expect(AnalyticsConsent.isAllowed('usage')).toBe(false);
+  it('falls back to the default level when storage raises an error', async () => {
+    vi.mocked(loadAnalyticsQueue).mockRejectedValueOnce(new Error('storage fail'));
 
-    await AnalyticsConsent.setLevel('full');
-    expect(AnalyticsConsent.isAllowed('usage')).toBe(true);
-  });
-
-  it('storage errors during initialize do not throw and default is used', async () => {
-    (SecureStorage.getItem as any).mockRejectedValueOnce(new Error('storage fail'));
     const level = await AnalyticsConsent.initialize();
+
     expect(level).toBe('basic');
+    expect(AnalyticsConsent.getLevel()).toBe('basic');
+    expect(currentConsentLevel).toBe('basic');
   });
 });

@@ -1,45 +1,40 @@
 # Analytics
 
-Hooks for analytics buffer status, breadcrumb queue monitoring, consent management, and telemetry integration. Used to monitor analytics event queues, manage user consent, and ensure events are sent reliably.
+Hooks for analytics event emission, consent management, and crash report opt-in. Public event emission now lives in `managers/analytics/analytics-manager.ts` via the `Analytics` export; this module stays focused on UI-facing consent and event tracking.
 
 ## When to Use This Module
 
 **Use this module if you need to:**
-- Monitor analytics buffer status for UI or debugging
-- Track breadcrumb queue state for offline analytics
+- **Track analytics events** from React components (use `Analytics.track()` from `managers/analytics/analytics-manager`)
 - **Manage user analytics consent levels** (GDPR compliance, persistence)
 - **Handle crash report opt-in when consent is 'none'** (privacy-first error reporting)
-- Trigger UI changes based on analytics queue state
 
 **Do NOT use this module for:**
-- Sending analytics events directly (use `lib/analytics`)
-- Managing analytics configuration (see `lib/analytics`)
+- Managing analytics configuration and lower-level analytics plumbing (see `lib/analytics`)
+- Direct access to buffer or queue state (breadcrumb queue stats available via `lib/analytics/exporters/breadcrumb-queue.ts`)
 
 ## Architecture & Data Flow
 
 ```
 Component
         ↓
-useAnalyticsBufferStatus / useBreadcrumbQueueStatus / useAnalyticsConsent / useCrashConsentReport
+useAnalyticsConsent / useCrashConsentReport / Analytics.track()
         ↓
-Read analytics event buffer or breadcrumb queue state / manage consent / handle crash opt-in
+Manage consent / handle crash opt-in / emit events through manager gateway
         ↓
-Update UI or trigger flush / persist consent changes / send crash reports
+Persist consent / send crash reports / queue events to background jobs
 ```
 
 **Key Principles:**
-- **Observability**: Hooks expose analytics buffer and breadcrumb queue state for UI/monitoring.
+- **Event Emission**: `Analytics.track()` provides the public analytics API with built-in consent gating.
 - **Consent Management**: `useAnalyticsConsent` provides GDPR-compliant consent management with persistence.
 - **Crash Opt-in**: `useCrashConsentReport` enables privacy-first error reporting when consent is 'none'.
-- **Separation**: Event sending and config live in `lib/analytics`.
+- **Separation**: Event sending and job queuing live in the manager gateway; consent and exporter plumbing live in `lib/analytics`.
 
 ## API Reference
 
-### `useAnalyticsBufferStatus()`
-Read the current status of the analytics event buffer.
-
-### `useBreadcrumbQueueStatus()`
-Read the current status of the breadcrumb queue for offline analytics.
+### `useAnalytics()` & `useAnalyticsSession()`
+Track analytics events from React components with session context.
 
 ### `useAnalyticsConsent(options?)`
 **GDPR-compliant consent management hook.**
@@ -94,27 +89,26 @@ if (canOptIn) {
 - None
 
 ### Internal Dependencies
-- **`lib/analytics`** – analytics event buffer, breadcrumb queue, and telemetry logic
+- **`@/managers/analytics/analytics-manager`** – public analytics emission gateway with consent gating
+- **`lib/analytics`** – consent management, breadcrumb queue, and telemetry logic
 
 ## Error Handling & Edge Cases
 
-### Buffer Overflows
-If the buffer is full, hooks should surface status for UI to prompt a flush or warn the user.
-
-### Queue Issues
-Breadcrumb queue status should handle cases where the queue is corrupted or provider is unavailable.
+### Consent Persistence
+Consent changes are persisted to storage with retry logic; failures throw an AnalyticsError.
 
 ## Performance Notes
 
 Buffer and queue status checks are lightweight; avoid polling too frequently.
 
 ## Related Modules
+- **`@/managers/analytics/analytics-manager`** – Public analytics emission gateway
 - **`lib/analytics`** – analytics event buffer, breadcrumb queue, and telemetry
 
 ## File Breakdown
 | File | Purpose |
 | ---- | ------- |
-| `use-analytics-buffer-status.ts` | Read analytics event buffer status for UI/monitoring |
-| `use-breadcrumb-queue-status.ts` | Read breadcrumb queue status for offline analytics monitoring |
+| `use-analytics.ts` | Track analytics events from React components with session context |
 | `use-analytics-consent.ts` | GDPR-compliant consent management with persistence and database sync |
 | `use-crash-consent-report.ts` | Privacy-first crash reporting opt-in for 'none' consent users |
+| `useErrorReporting.ts` | Error reporting integration |

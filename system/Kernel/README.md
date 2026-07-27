@@ -244,7 +244,7 @@ capabilities: {
 
 ### Internal Dependencies
 
-- **`@/lib/analytics`** - Analytics network integration
+- **`@/managers/analytics/analytics-manager`** - Analytics network integration
 - **`@/lib/error`** - Safe mode state management
 - **`@/lib/utils/logger`** - Bootstrap logging
 - **`@/system/network`** - Network detection system
@@ -377,7 +377,7 @@ logger.category('bootstrap').info('Phase complete', {
 - **`system/network`** - Network detection system
 - **`system/storage`** - Storage validation and migrations
 - **`lib/auth`** - Authentication system
-- **`lib/analytics`** - Analytics exporters
+- **`managers/analytics/analytics-manager`** - Analytics exporters
 - **`lib/error`** - Error tracking and safe mode
 
 await AppKernel.initialize();

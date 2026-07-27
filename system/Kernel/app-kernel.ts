@@ -21,48 +21,45 @@
 
 import { getAppConfig } from "@/config";
 import {
-    cleanupAnalyticsNetworkIntegration,
-} from "@/lib/analytics/exporters/analytics-network-integration";
-import {
-    NetworkCascadeDetector,
+  NetworkCascadeDetector,
 } from "@/lib/error/network-cascade-detector";
 import {
-    createSafeModeState,
-    DEFAULT_SAFE_MODE_CONFIG,
-    SafeModeLevel,
-    SafeModeReason,
-    type SafeModeState,
+  createSafeModeState,
+  DEFAULT_SAFE_MODE_CONFIG,
+  SafeModeLevel,
+  SafeModeReason,
+  type SafeModeState,
 } from "@/lib/error/safemode/safe-mode";
 import { logger } from "@/lib/utils";
 import { getPhaseMessage, type PhaseName } from "@/localization";
 import {
-    NetworkDetection,
-    NetworkStatus,
+  NetworkDetection,
+  NetworkStatus,
 } from "@/system/Network";
 import {
-    KernelErrorCode,
-    KernelPhase,
-    type AppKernelState,
-    type KernelCapabilities,
-    type KernelError,
-    type KernelListener,
-    type PhaseProgress,
+  KernelErrorCode,
+  KernelPhase,
+  type AppKernelState,
+  type KernelCapabilities,
+  type KernelError,
+  type KernelListener,
+  type PhaseProgress,
 } from "@/type-definitions/kernel-types";
 import type { RegistrationResult } from "@/type-definitions/registration";
 import {
-    calculateEffectiveTimeout,
-    calculateSlowdownFactor,
-    createSlowdownAnalytics,
-    finalizeBootstrapAnalytics,
-    initializeBootstrapAnalytics,
-    type KernelBootstrapAnalytics,
+  calculateEffectiveTimeout,
+  calculateSlowdownFactor,
+  createSlowdownAnalytics,
+  finalizeBootstrapAnalytics,
+  initializeBootstrapAnalytics,
+  type KernelBootstrapAnalytics,
 } from "./phase-helpers/adaptive-phase-executor";
 import { createPhaseContext } from "./phase-helpers/phase-context";
 import {
-    canRunPhase,
-    isNonRecoverablePhase,
-    validatePhaseGraph,
-    type PhaseName as DependencyPhaseName,
+  canRunPhase,
+  isNonRecoverablePhase,
+  validatePhaseGraph,
+  type PhaseName as DependencyPhaseName,
 } from "./phase-helpers/phase-dependency-graph";
 import { classifyPhaseError } from "./phase-helpers/phase-error-classifier";
 import { authPhase } from "./phases/auth-phase";
@@ -88,12 +85,12 @@ import { storagePhase } from "./phases/storage-phase";
  * These exports prevent breaking external imports from system/Kernel
  */
 export {
-    KernelErrorCode,
-    KernelPhase, type AppKernelState,
-    type KernelCapabilities,
-    type KernelError,
-    type KernelListener,
-    type PhaseProgress
+  KernelErrorCode,
+  KernelPhase, type AppKernelState,
+  type KernelCapabilities,
+  type KernelError,
+  type KernelListener,
+  type PhaseProgress
 } from "@/type-definitions/kernel-types";
 
 /**
@@ -610,7 +607,7 @@ class AppKernelClass {
           (a, b) => a + b,
           0,
         );
-        const { Analytics } = await import("@/lib/analytics");
+        const { Analytics } = await import("@/managers/analytics/analytics-manager");
 
         // Track D: Send structured bootstrap analytics (phase timings, slowdown, network)
         if (this.bootstrapAnalytics) {
@@ -668,7 +665,7 @@ class AppKernelClass {
         await Promise.allSettled([
           import("react-native"),
           import("@/lib/storage"),
-          import("@/lib/analytics"),
+          import("@/managers/analytics/analytics-manager"),
           import("@/system/Services").then(m => m.isBackendAvailable()),
         ]);
 
@@ -698,11 +695,7 @@ class AppKernelClass {
 
       // Analytics availability
       if (analyticsResult.status === "fulfilled") {
-        try {
-          capabilities.analytics = analyticsResult.value.Analytics.enabled();
-        } catch {
-          logger.category("bootstrap").debug("Analytics.enabled() failed");
-        }
+        capabilities.analytics = true;  // Manager imported successfully
       } else {
         logger.category("bootstrap").debug("Analytics not available");
       }
@@ -1525,15 +1518,6 @@ class AppKernelClass {
    */
   destroy(): void {
     logger.category("bootstrap").info("AppKernel shutting down");
-
-    // Cleanup analytics network integration
-    try {
-      cleanupAnalyticsNetworkIntegration();
-    } catch (error) {
-      logger.category("bootstrap").warn("Failed to cleanup analytics network integration", {
-        error: (error as Error).message,
-      });
-    }
 
     // Cleanup bootstrap timeout handle (if not already cleared)
     if (this.bootstrapTimeoutHandle) {

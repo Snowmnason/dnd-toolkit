@@ -1,6 +1,7 @@
-import { trackFeatureBlocked } from '@/lib/analytics';
+
 import { hasFeature as checkHasFeature, isPremium as checkIsPremium } from '@/lib/premium';
 import { logger } from '@/lib/utils/logger';
+import { FeatureAnalytics } from '@/managers/analytics/feature-analytics-manager';
 import { useEffect, useRef, useState } from 'react';
 
 export interface UsePremiumFeatureState {
@@ -60,7 +61,7 @@ export function usePremiumFeature(featureKey?: string): UsePremiumFeatureState {
     if (trackedRef.current) return;
 
     try {
-      trackFeatureBlocked({ feature: featureKey!, reason: 'requires_premium' });
+      FeatureAnalytics.trackFeatureBlocked({ feature: featureKey!, reason: 'requires_premium' });
     } catch (error) {
       // Log tracking failures for debugging without blocking feature checks
       logger.category('other').debug('Failed to track feature blocked event:', error);

@@ -63,16 +63,17 @@ export interface ReAuthError {
 }
 
 // ============================================================================
-// SHARED POST-AUTH SETUP (Steps 2-4 — identical for all entry points)
+// SHARED POST-AUTH SETUP (Steps 1-4 — identical for all entry points)
 // ============================================================================
 
 /**
  * Shared logic after session is established.
  *
  * Steps:
- * 2. Set HAS_ACCOUNT flag
- * 3. Mark sync required (deferred to post-appReady) + update LAST_LOGGED_IN timestamp
- * 4. Determine redirect (profile-based, with pending invite check)
+ * 1. Set HAS_ACCOUNT flag
+ * 2. Mark sync required (deferred to post-appReady) + update LAST_LOGGED_IN timestamp
+ * 3. Determine redirect (profile-based, with pending invite check)
+ * 4. Initialize analytics consent (if needed — idempotent, after user data loaded)
  *
  * @param userId - Authenticated user ID
  * @param context - What triggered auth (drives redirect logic for bootstrap)
@@ -84,7 +85,7 @@ async function performPostAuthSetup(
   const errors: { phase: string; message: string; error?: Error }[] = [];
 
   // =====================================================================
-  // STEP 2: SET HAS_ACCOUNT FLAG
+  // STEP 1: SET HAS_ACCOUNT FLAG
   // =====================================================================
   try {
     await AuthStateManager.setHasAccount(true);
@@ -95,7 +96,7 @@ async function performPostAuthSetup(
   }
 
   // =====================================================================
-  // STEP 3: MARK SYNC REQUIRED + UPDATE LAST_LOGGED_IN
+  // STEP 2: MARK SYNC REQUIRED + UPDATE LAST_LOGGED_IN
   // =====================================================================
   // worldIds from sync are not used for routing — sync runs post-appReady via useSyncSplash
   const worldIds: string[] = [];
@@ -112,7 +113,7 @@ async function performPostAuthSetup(
   }
 
   // =====================================================================
-  // STEP 4: DETERMINE REDIRECT
+  // STEP 3: DETERMINE REDIRECT
   // =====================================================================
   let redirect: string | undefined;
 
@@ -158,6 +159,19 @@ async function performPostAuthSetup(
     redirect = navDecision.redirect;
     errors.push({ phase: 'redirect', message: navDecision.reason, error: error instanceof Error ? error : undefined });
     logger.category('auth').warn(`[${context}] Post-auth: Failed to determine redirect`, error);
+  }
+
+  // =====================================================================
+  // STEP 4: INITIALIZE ANALYTICS CONSENT (if needed)
+  // After auth is complete and all user data is loaded, check storage freshness
+  // =====================================================================
+  try {
+    const { initializeConsentIfNeeded } = await import('@/managers/analytics/analytics-manager');
+    await initializeConsentIfNeeded();
+    logger.category('auth').debug(`[${context}] Post-auth: Analytics consent initialized`);
+  } catch (error) {
+    logger.category('auth').warn(`[${context}] Post-auth: Failed to initialize analytics consent (non-critical)`, error);
+    // Non-blocking — consent defaults to 'basic'
   }
 
   return { redirect, worldIds, errors };

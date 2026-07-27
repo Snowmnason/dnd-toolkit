@@ -132,7 +132,7 @@ if (state === 'OPEN') {
 
 - **`system/Storage`** – Cache persistence
 - **`system/Network`** – Network status detection
-- **`lib/analytics`** – Request metrics
+- **`managers/analytics/analytics-manager`** – Request analytics gateway
 - **`lib/utils/logger`** – Request logging
 
 ## Error Handling & Edge Cases
@@ -170,7 +170,7 @@ Deduplication prevents duplicate API calls.
 - **`lib/middleware/api`** – Calls RequestManager with validated requests
 - **`system/Storage`** – Persists cached responses
 - **`system/Network`** – Provides network status for offline handling
-- **`lib/analytics`** – Tracks request success/failure metrics
+- **`managers/analytics/analytics-manager`** – Tracks request success/failure metrics
 
 ## File Breakdown
 

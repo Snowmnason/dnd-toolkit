@@ -13,39 +13,64 @@ Purpose: enforce the small set of rules that must apply in every coding session.
 
 ## Architecture Model
 
-This repo uses two different architectural rules. Do not blur them together.
+This repo implements Clean Architecture (Uncle Bob, 2017). Enforce these rules strictly.
 
 ### 1. Dependency Boundaries
 
 This rule answers: what is allowed to import what?
 
-Primary pipeline:
+**Full dependency flow (Presentation→Logic→Infrastructure):**
 
 ```
-/app + /components
+Presentation (Hooks/Components) — PUBLIC ENTRY POINT
+    ↓ (can call)
+Managers (Orchestration) — PUBLIC ENTRY POINT  
+    ├─ Call /lib for domain logic (ONLY layer that imports lib)
+    ├─ Call other managers for cross-domain coordination  
+    └─ Call /middleware for infrastructure
     ↓
-/hooks
+/lib (Domain Logic) — PRIVATE IMPLEMENTATION
+    ├─ Pure business logic (math, transforms, validation)
+    ├─ Can ONLY import /lib and shared support
+    ├─ CANNOT import managers, middleware, or system
+    └─ Lib-to-lib calls must route through managers
+    ↓  
+/middleware (Adapters) — PUBLIC ENTRY POINT
+    ├─ Precondition checks (network, storage readiness)
+    ├─ Data normalization and adaptation
+    └─ Calls /system for infrastructure
     ↓
-/managers
-    ↓
-/middleware
-    ↓
-/system
+/system (Infrastructure) — PRIVATE IMPLEMENTATION  
+    ├─ HTTP, database, files, platform APIs
+    ├─ App-agnostic; must remain portable
+    ├─ CANNOT import lib, managers, or middleware
+    └─ Can emit events/callbacks for Hooks (no direct imports)
+
+Shared Support (Config/Types/Validation/Maps) — EXEMPT FROM RULES
+    └─ Can be imported by any layer
 ```
 
-Independent domain logic:
+**Public vs. Private Principle:**
+- PUBLIC layers: Managers, Middleware (entry points for calling)
+- PRIVATE layers: Lib, System (implementation details)
 
-```
-/managers → /lib
-```
+**Enforcement Rules (Mandatory):**
+- Managers are the ONLY layer that imports /lib modules
+- Managers can call other managers (cross-domain orchestration OK)
+- System can emit events; Hooks can listen (no direct imports)
+- Lib CANNOT import managers (no upward calls)
+- Lib CANNOT import middleware (no sibling calls)
+- Lib-to-lib imports must go through managers (no shortcuts)
+- System CANNOT import lib, managers, or middleware
+- Hooks CANNOT skip managers; must call through manager layer
 
-- `/app` and `/components` are presentation. They render UI and should depend on hooks and UI components, not lower layers.
-- `/hooks` is the React bridge. Hooks may coordinate React state, perform fast UI-facing input validation for immediate feedback, and call managers, but should not reach down into infrastructure directly.
-- `/managers` is the orchestration layer. Managers coordinate use cases, perform business validation and normalization, control cross-module pipelines, call `lib` when domain logic is needed, and hand off infrastructure-facing work to `middleware`.
-- `/lib` contains independent domain logic and reusable module behavior. It is not part of the main pipeline and should be called by managers rather than used as a cross-module orchestration layer.
-- `/middleware` adapts domain work to provider and infrastructure concerns.
-- `/system` is portable infrastructure only. It must remain app-agnostic and must never depend upward on repo-specific orchestration layers.
-- Shared support directories sit outside the main pipeline and may be imported across layers when they provide definitions, shared messages, configuration, or pure logic rather than orchestration: `/maps`, `/type-definitions`, `/validation`, `/pure-algo-immutables`, `/localization`, and `/config`.
+**Rationale:**
+- Lib is pure logic; if lib breaks, only one manager is affected
+- Managers are orchestration; if manager deleted, only call sites change
+- If system breaks, only middleware is affected
+- Shared support breaks these rules (by design; it's infrastructure)
+
+**Reference:** [Manager Gateway Pattern issue](../../docs/issues/Milestone%202/Tier%208/300%20-%20Manager%20Gateway%20Pattern/Manager%20Gateway%20Pattern.md) — Full spec with examples
 
 ### 2. Runtime Ownership
 

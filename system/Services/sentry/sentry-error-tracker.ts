@@ -2,8 +2,8 @@
  * Sentry Error Tracker Implementation
  *
  * Implements ErrorTrackerProvider interface for Sentry error tracking.
- * All Sentry SDK call sites are isolated to lib/services/sentry/ — see also
- * sentry-adapter.ts (breadcrumbs) and service-initializer.ts (SDK init).
+ * All Sentry SDK call sites are isolated to system/Services/sentry/ — see also
+ * sentry-provider.ts (breadcrumbs) and service-initializer.ts (SDK init).
  *
  * All direct Sentry SDK calls are isolated here. Callers use the provider interface
  * and never import Sentry directly.
@@ -13,8 +13,8 @@ import * as Sentry from '@sentry/react-native';
 import Constants from 'expo-constants';
 
 import { getAppConfig, isDevelopment } from '@/config';
-import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
 import { logger } from '@/lib/utils/logger';
+import { currentConsentLevel } from '@/type-definitions/analytics-types';
 import {
     ErrorCaptureOptions,
     ErrorTrackerProvider,
@@ -120,8 +120,7 @@ export class SentryErrorTracker implements ErrorTrackerProvider {
     // SWITCH #2: Consent-level gating for user identification
     // Do not send user-identifying data unless consent level permits it.
     // Consent level 'none' means SDK stays silent on user data; 'basic' and 'full' allow identification.
-    const consentLevel = AnalyticsConsent.getLevel();
-    if (consentLevel === 'none' && user !== null) {
+    if (currentConsentLevel === 'none' && user !== null) {
       return;
     }
 

@@ -433,6 +433,13 @@ async function initializeSentryExporter(): Promise<void> {
 
         // Register to global registry
         exporterRegistry.register(sentryExporter);
+
+        // Register the breadcrumb provider adapter used by the active send path
+        // (middleware/services/analytics-service.ts calls getAdapter('sentry') for every
+        // job-queued event). Without this, events are silently dropped at send time.
+        const { registerSentryAdapter } = await import('./sentry/sentry-provider');
+        registerSentryAdapter();
+
         logger.category('bootstrap').info(`[Analytics Exporter] Sentry exporter initialized and registered`);
         updateServiceStatus('analytics', 'ready', 'sentry');
         break;

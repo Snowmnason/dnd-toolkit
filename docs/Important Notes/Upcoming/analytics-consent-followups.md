@@ -48,6 +48,31 @@ Possible future improvements:
 
 - dedicated crash-report consent modal copy
 - user education around what is sent and what is not
+
+## Analytics Debug Panel (Infrastructure Introspection)
+
+**Status**: Infrastructure exists for introspection; no dedicated debug screen yet.
+
+**Current send path**: `managers/analytics/analytics-manager.ts` queues events via JobsManager to the background job queue (persisted, auto-retries). Breadcrumb events are tracked separately in `lib/analytics/exporters/breadcrumb-queue.ts`.
+
+**What remains for introspection**:
+- `lib/analytics/exporters/breadcrumb-queue.ts` — Provides `getBreadcrumbQueueStats()` synchronous helper for inspecting breadcrumb queue state:
+  - Returns: queue size, oldest breadcrumb time, overflow count, provider name, flushing status
+  - Example output: `{ queueSize: 15, oldestBreadcrumbTime: 1234567890, overflowCount: 3, providerName: 'Sentry', isFlushing: false }`
+  - Use in logging or conditional logic where hook overhead isn't needed
+
+- Event queue is managed by JobsManager (background job queue), not a dedicated analytics buffer. Real-time event introspection would require adding a status export to JobsManager or creating a new analytics-status helper.
+
+**Why not connected yet**:
+- No admin screen or debug panel built yet to display this data
+- Event queue introspection surface would need to be added (JobsManager currently has no public stats export)
+- Infrastructure introspection is nice-to-have, not core app functionality
+
+**To use later**:
+1. Create a debug/admin screen component (e.g., `AppScreens/admin/AnalyticsDebug.tsx`)
+2. Import breadcrumb stats helper: `import { getBreadcrumbQueueStats } from '@/lib/analytics/exporters/breadcrumb-queue'`
+3. Add event queue introspection (may require extending JobsManager with a public stats export)
+4. Render queue stats alongside buttons to trigger manual flushes or clear queue
 - optional remembered preference for future crash-report prompts
 
 ### Audit And Debug Visibility

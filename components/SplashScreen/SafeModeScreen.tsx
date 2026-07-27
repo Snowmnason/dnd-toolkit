@@ -1,5 +1,5 @@
 import { getAppConfig } from '@/config';
-import { Analytics, Performance } from "@/hooks/analytics";
+import { Analytics, Performance } from '@/hooks/analytics';
 import {
   RecoveryAction,
   SafeModeLevel,

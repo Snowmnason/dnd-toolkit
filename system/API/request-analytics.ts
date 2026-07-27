@@ -1,11 +1,12 @@
-import { Analytics } from "@/lib/analytics/analytics-manager";
-import { AnalyticsConsent } from "@/lib/analytics/consent/consent";
-import { getCrashReportPayload } from "@/lib/analytics/consent/consent-error-payload";
+
 import { sanitizeError as sanitizeErrorForAnalytics } from "@/lib/analytics/utils";
 import { enrichError, extractErrorCode } from '@/lib/error/error-enrichment';
 import { reportError } from '@/lib/error/error-manager';
 import { logger, type LogCategory } from "@/lib/utils";
+import { Analytics } from "@/managers/analytics/analytics-manager";
+import { AnalyticsError } from "@/managers/error/module/analyticsError";
 import type { ErrorCodeType } from "@/maps/ERROR_CODES";
+import { currentConsentLevel } from "@/type-definitions/analytics-types";
 import type { RequestInterceptor } from "./interceptor";
 
 /**
@@ -131,8 +132,6 @@ export function attachRequestTracking<T>(
   key: string,
   startedAt: number,
 ): Promise<T> {
-  if (!Analytics.enabled()) return promise;
-
   return promise.then(
     (value) => {
       const durationMs = Date.now() - startedAt;
@@ -218,10 +217,10 @@ export function reportErrorToTracker(
     }
 
     // Get tiered payload based on consent level
-    const captureOptions = getCrashReportPayload(
+    const captureOptions = AnalyticsError.getCrashReportPayload(
       errorObj,
       undefined,
-      AnalyticsConsent.getLevel(),
+      currentConsentLevel,
     );
 
     if (captureOptions !== null) {

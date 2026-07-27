@@ -384,10 +384,10 @@ async function flushQueue(cfg: { async: boolean; debounceMs: number; queueSize: 
 
 async function dispatchSingleWithTimeout(event: AnalyticsEvent, context: ExportContext | undefined, timeoutMs: number) {
   // Check consent gate before dispatching
-  const consentCategory = getConsentCategoryForEvent(event.type, event.name);
+  const consentCategory = getConsentCategoryForEvent(event.name);
   const consentLevel = AnalyticsConsent.getLevel();
   
-    if (!shouldEmitEvent(consentCategory, consentLevel)) {
+  if (!shouldEmitEvent(consentCategory, consentLevel)) {
     logger.category('analytics').analytics(`Event '${event.name}' dropped (category=${consentCategory ?? 'unmapped'}, level=${consentLevel})`);
     return;
   }

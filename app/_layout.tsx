@@ -18,7 +18,7 @@ import {
 // Contexts — direct file imports to avoid resolving the full @/contexts barrel,
 // which includes toast, snackbar, notification, modal, nav-drawer, and theme contexts.
 import { PanelNavDrawer } from "@/AppScreens/main-panels/PanelNavDrawer";
-import { Analytics, sessionManager } from "@/hooks/analytics";
+import { useAnalyticsSession } from "@/hooks/analytics";
 import { useAuthLinkObserver } from "@/hooks/auth";
 import { executeRecoveryAction, getSafeModeNavigationTarget } from "@/hooks/error";
 import { useClearSafeMode } from "@/hooks/error/use-safe-mode";
@@ -123,15 +123,8 @@ function RootLayoutContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { panelNav.goToLeftPanel(); }, [(segments as string[])[0], (segments as string[])[1]]);
 
-  // Identify user to analytics when available
-  useEffect(() => {
-    Analytics.identify(userId ? { id: userId } : null);
-
-    // Start session when user is identified
-    if (userId) {
-      sessionManager.startSession(userId);
-    }
-  }, [userId]);
+  // Initialize analytics session and user context
+  useAnalyticsSession(userId);
 
   // ==================== RENDER LOGIC SECTION ====================
   // Note: UIBlockerLayer (outermost in provider tree) handles all loading overlays.

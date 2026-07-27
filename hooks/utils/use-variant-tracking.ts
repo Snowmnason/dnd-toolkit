@@ -25,10 +25,7 @@
  * ```
  */
 
-import {
-  trackVariantEngagement,
-  trackVariantPerformance,
-} from "@/lib/analytics";
+import { VariantAnalytics } from "@/managers/analytics/feature-analytics-manager";
 import { useUserId } from "@/providers";
 import { useCallback } from "react";
 
@@ -76,7 +73,7 @@ export function useVariantTracking(
     (action: string, metadata?: Record<string, any>) => {
       if (!userId) return; // Skip if no user ID
 
-      trackVariantEngagement({
+      VariantAnalytics.trackVariantEngagement({
         flagName,
         variant,
         action,
@@ -94,7 +91,7 @@ export function useVariantTracking(
     (metric: string, value: number) => {
       if (!userId) return; // Skip if no user ID
 
-      trackVariantPerformance({
+      VariantAnalytics.trackVariantPerformance({
         flagName,
         variant,
         userId,

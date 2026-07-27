@@ -1,8 +1,8 @@
 import { logger } from '@/hooks/utils';
-import { AnalyticsConsent } from '@/lib/analytics/consent/consent';
-import { getCrashReportPayload } from '@/lib/analytics/consent/consent-error-payload';
-import { sessionManager } from '@/lib/analytics/session';
 import { reportError } from '@/lib/error/error-manager';
+import { AnalyticsError } from '@/managers/error/module/analyticsError';
+import { Analytics } from '@/managers/analytics/analytics-manager';
+import { currentConsentLevel } from '@/type-definitions/analytics-types';
 import { ErrorInfo } from 'react';
 
 /**
@@ -20,17 +20,17 @@ export function handleErrorReport(error: Error, errorInfo: ErrorInfo): void {
 
   // Track error in session
   try {
-    sessionManager.trackError();
+    Analytics.trackSessionError();
   } catch (sessionError) {
     logger.category('ui').warn('Could not track error in session:', sessionError);
   }
 
   // Send to error tracking service (respects consent via getCrashReportPayload)
   try {
-    const captureOptions = getCrashReportPayload(
+    const captureOptions = AnalyticsError.getCrashReportPayload(
       error,
       errorInfo.componentStack || undefined,
-      AnalyticsConsent.getLevel()
+      currentConsentLevel
     );
     if (captureOptions !== null) {
       reportError(error, captureOptions);

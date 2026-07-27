@@ -1,6 +1,6 @@
 # Analytics Module
 
-Consent-aware analytics and performance monitoring system handling event tracking, user identification, and offline event queuing.
+Consent-aware analytics and performance monitoring primitives for event tracking, user identification, and offline event queuing. Public callers now use `managers/analytics/analytics-manager.ts`; this module holds the lower-level analytics implementation.
 
 ## When to Use This Module
 
@@ -48,7 +48,7 @@ Network Online?
 
 ### `Analytics` Object
 
-Main entry point. Imported from `@/lib/analytics`.
+Lower-level analytics API. Public event emission is routed through `@/managers/analytics/analytics-manager`.
 
 #### `Analytics.enabled(): boolean`
 
@@ -341,59 +341,25 @@ await ConsentSyncQueue.clear(); // Clear all pending syncs
 
 ---
 
-### Analytics Buffer (Offline Queue)
+### Analytics Event Sending (Background Job)
 
-Persists events to encrypted storage (works with lib/storage) when offline and flushes on reconnect (works with lib/network). Controlled by the `analytics.buffer` config block.
+`Analytics.track()` enqueues each event as an `analytics_send_event` job via `JobsManager` instead of using a hand-rolled offline queue. The `BackgroundJobQueue` (see `lib/jobs`) persists jobs across restarts and retries automatically on reconnect, so there is no bespoke buffer, network listener, or backoff scheduler to maintain here.
 
-#### `analyticsBufferService.enqueue(event): Promise<QueuedAnalyticsEvent | null>`
+The job handler lives in `lib/jobs/core/analytics-send-event-job.ts`. It re-checks consent at execution time before sending, discards on 4xx responses, and throws on 5xx/network errors so the job queue retries with backoff.
 
-Adds an event to the offline queue. `id`, `timestamp`, and `retryCount` are generated automatically.
-
-```ts
-await analyticsBufferService.enqueue({
-  eventType: "screen_view",
-  payload: { screen: "HomeScreen" },
-  maxRetries: 5,
-});
-```
-
-#### `analyticsBufferService.getStats(): AnalyticsBufferStats`
-
-Returns `queueSize`, `maxSize`, `oldestEventAge` (ms), and a breakdown by event type.
-
-#### `analyticsBufferService.clear(): Promise<void>`
-
-Clears all queued events. Use only for user-initiated data deletion.
-
-#### `calculateExponentialBackoff(retryCount, baseMs?): number`
-
-Returns the delay in ms for a given retry attempt. Base defaults to 1000ms; caps at 16000ms (retry 4+).
-
-**Buffer config** (in `config/appsettings.json`):
+**Endpoint config** (in `config/appsettings.json`):
 
 ```json
 {
   "analytics": {
     "buffer": {
-      "enabled": true,
-      "maxSize": 100,
-      "maxRetries": 5,
-      "batchSize": 25,
-      "retryBaseMs": 1000,
-      "debounceMs": 5000
+      "endpoint": "https://example.com/analytics"
     }
   }
 }
 ```
 
-| Setting | Default | Description |
-| ------- | ------- | ----------- |
-| `enabled` | `true` | Turns the offline buffer on/off |
-| `maxSize` | `100` | Max queued events; oldest dropped when exceeded (FIFO) |
-| `maxRetries` | `5` | Attempts before an event is discarded |
-| `batchSize` | `25` | Events per flush request |
-| `retryBaseMs` | `1000` | Base for exponential backoff |
-| `debounceMs` | `5000` | Debounce delay on network-online transitions |
+If `analytics.buffer.endpoint` is not set, it falls back to `EXPO_PUBLIC_ANALYTICS_ENDPOINT`, then to parsing `EXPO_PUBLIC_SENTRY_DSN`.
 
 ---
 
@@ -413,6 +379,11 @@ Adds a breadcrumb to the queue. Deduplicates based on fingerprint hash to preven
 
 Returns queue metrics like size, oldest breadcrumb age, provider name.
 
+#### `getBreadcrumbQueueStats()` — Synchronous helper for queue introspection
+
+Returns `{ queueSize, isFlushing, lastFlushTime, oldestBreadcrumbTime, providerName, overflowCount }`.
+Use in logging or conditional logic where hook overhead isn't needed.
+
 #### `flush()` — Manual flush (async)
 
 Triggers a manual flush of queued breadcrumbs via the provider.
@@ -420,10 +391,6 @@ Triggers a manual flush of queued breadcrumbs via the provider.
 #### `BreadcrumbProvider` interface — contract for implementing adapters
 
 Interface for provider adapters: `sendBatch(breadcrumbs)`, `parseHttpResponse(response)`.
-
-#### `useBreadcrumbQueueStatus()` — Debug hook
-
-Returns `{ queueSize, isFlushing, lastFlushTime, oldestBreadcrumbTime, providerName }`.
 
 **Queue config** (in `config/appsettings.json`):
 
@@ -642,8 +609,8 @@ Clear all baselines.
 - **`lib/services`** – ErrorTrackerProvider for breadcrumb and user tracking
 - **`lib/config`** – Feature flags and performance thresholds
 - **`lib/utils/logger`** – Category-based debug and error logging
-- **`lib/storage`** – Encrypted queue persistence (analytics buffer only)
-- **`lib/network`** – Online/offline detection for automatic flush (analytics buffer only)
+- **`lib/storage`** – Encrypted queue persistence (breadcrumb queue only)
+- **`lib/network`** – Online/offline detection for automatic flush (breadcrumb queue only)
 
 ---
 
@@ -653,31 +620,19 @@ Clear all baselines.
 
 When error tracking is disabled or NoOp tracker is registered, all `Analytics.*` calls are silent no-ops. Nothing throws.
 
-### Circular Dependency
-
-`session.ts` uses `getErrorTracker()` directly to avoid circular imports with the main analytics module.
-
 ### Abandoned Performance Marks
 
 If `endMeasure` is never called (e.g., an error interrupted the flow), the mark is silently removed after 5 minutes by `cleanupOldMarks`.
 
-### Consent Withdrawn Mid-Buffer
+### Consent Withdrawn Mid-Flight
 
-Queued offline events stay in the buffer but will not be flushed until consent is restored. Events are not discarded automatically on consent withdrawal.
+Pending `analytics_send_event` jobs are cleared (not sent) when consent is downgraded. The job handler also re-checks consent at execution time, so an event enqueued while consent was granted will still be dropped if consent is withdrawn before it runs.
 
-### Buffer Overflow
-
-When the queue exceeds `maxSize`, the oldest events are dropped first (FIFO). A session-only `overflowCount` counter tracks dropped events; reset it with `getAndResetOverflowCount()` from `analyticsBufferService`.
-
-### Storage Unavailable
-
-If SecureStorage is unavailable, the buffer falls back to an in-memory queue. Events will be lost if the app restarts before they are flushed.
-
-### Flush Error Handling
+### Analytics Send Failure Handling
 
 - **4xx responses**: Event is discarded immediately (permanent failure).
-- **5xx / network errors**: Event is rescheduled with exponential backoff.
-- **Max retries exceeded**: Event is discarded and logged.
+- **5xx / network errors**: The job throws, and the job queue retries with exponential backoff.
+- **Max retries exceeded**: Job queue marks the job failed and stops retrying.
 
 ---
 
@@ -695,20 +650,14 @@ All consent checks are O(1) and run before any Sentry call, so denied categories
 
 O(n) scan over active marks (typically fewer than 10). Runs automatically after every `startMeasure` call.
 
-### Buffer Overhead
-
-- Retry scheduler runs every 30 seconds — O(n) scan over queued events (max 100).
-- Online transitions are debounced (default 5s) to avoid flush spam from network flapping.
-- Each queued event adds ~200 bytes of retry metadata to encrypted storage.
-
 ---
 
 ## Related Modules
 
 - **`lib/config`** – Service configuration (`errorProvider.enabled`, `analytics.enabled`) and performance thresholds (`slowScreenMs`, `slowRequestMs`)
 - **`lib/utils/logger`** – Category-based logging used throughout this module (`analytics`, `performance`)
-- **`lib/storage`** – Encrypted queue persistence for the offline buffer
-- **`lib/network`** – Online/offline state monitoring; triggers automatic buffer flush
+- **`lib/storage`** – Encrypted persistence for the breadcrumb queue
+- **`lib/network`** – Online/offline state monitoring used by the breadcrumb queue
 
 ---
 
@@ -718,9 +667,7 @@ O(n) scan over active marks (typically fewer than 10). Runs automatically after 
 | ---- | ------- |
 | `index.ts` | Barrel and main exports. Defines `Analytics`, `Performance`, and `trackFeatureBlocked()`. Re-exports everything from the other files. |
 | `consent.ts` | `AnalyticsConsent` manager. Tracks consent level (`none` / `basic` / `full`) and exposes `isAllowed()` for category gating. |
-| `session.ts` | `sessionManager`. Tracks session lifetime, screen views, and error count. Sends `session_started` and `session_ended` events. |
-| `analytics-buffer.ts` | Offline event queue. FIFO persistent storage via lib/storage, retry scheduling, overflow tracking, and batch flush logic. |
-| `analytics-network-integration.ts` | Connects the buffer to lib/network. Flushes queued events on online transitions with debouncing and consent checks. |
+| `session.ts` | `sessionManager`. Pure state tracking for session lifetime, screen views, and error count. Manager layer orchestrates breadcrumb emission. |
 | `breadcrumb-queue.ts` | Generic breadcrumb queue for offline queuing. Provider-agnostic, handles dedup, retry, and persistence. |
 | `provider-adapter.ts` | Interface and factory for provider adapters (e.g., Sentry). Enables swapping analytics backends. |
 | `sentry/` | Isolated Sentry implementation. |

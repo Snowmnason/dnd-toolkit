@@ -1,8 +1,9 @@
-import { AnalyticsConsent, shouldEmitEvent } from "@/lib/analytics";
+
 import { reportError } from "@/lib/error";
 import { logger } from "@/lib/utils";
 import { STORAGE_KEYS } from "@/maps";
 import { getPrivacyStorageBackend } from "@/middleware/storage";
+import { currentConsentLevel } from "@/type-definitions/analytics-types";
 
 export type AuthGuardScope = "signin" | "signup" | "reset";
 
@@ -111,9 +112,12 @@ export const recordAuthFailure = async (
   if (record.attempts >= MAX_ATTEMPTS) {
     record.lockedUntil = now + LOCKOUT_MS;
     // Report lockout to error tracker with structured security telemetry
-    // Auth lockout is a security event; treat as 'performance' (requires >= basic consent)
-    try {
-      if (shouldEmitEvent('performance', AnalyticsConsent.getLevel())) {
+    // Respect user's analytics consent preference.
+    // NOTE: This gates telemetry reporting but NOT the lockout itself (which always enforces).
+    // Trade-off: if consent='none', we lose audit trail of abuse attempts, but honor user's opt-out.
+    // Future: Consider making security events bypass consent (requires policy decision).
+    if (currentConsentLevel !== 'none') {
+      try {
         const emailDomain = email.split('@')[1] || 'unknown';
         reportError(
           new Error('auth.lockout'),
@@ -133,11 +137,11 @@ export const recordAuthFailure = async (
             },
           }
         );
+      } catch {
+        logger.category('security').debug(
+          "Error tracker disabled or failed to report lockout",
+        );
       }
-    } catch {
-      logger.category('security').debug(
-        "Error tracker disabled or failed to report lockout",
-      );
     }
   }
 

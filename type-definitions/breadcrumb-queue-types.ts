@@ -4,7 +4,7 @@
  * Immutable contracts for queuing and delivering breadcrumbs to analytics providers.
  * Used by:
  * - lib/analytics/exporters/breadcrumb-queue.ts (producer)
- * - lib/services/analytics-service.ts (middleware)
+ * - middleware/services/analytics-service.ts (middleware)
  * - system/Services/analytics-adapter.ts (adapter interface)
  * - Any breadcrumb provider implementation (consumer)
  */

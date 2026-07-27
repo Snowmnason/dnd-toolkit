@@ -187,6 +187,20 @@ export const CORE_JOBS: JobRegistryEntry[] = [
       });
     },
   },
+  {
+    name: "analytics-send-event",
+    register: async (queue) => {
+      const { registerAnalyticsSendEventJob } = await import("@/lib/jobs/core/analytics-send-event-job");
+      registerAnalyticsSendEventJob(queue);
+    },
+  },
+  {
+    name: "performance-regression-detected",
+    register: async (queue) => {
+      const { registerPerformanceRegressionJob } = await import("@/lib/jobs/core/performance-regression-job");
+      registerPerformanceRegressionJob(queue);
+    },
+  },
   /**
    * Network recovery full init — isolated handler for network recovery job setup.
    * Kept separate from degrade-system-init so Metro can analyze each graph independently.

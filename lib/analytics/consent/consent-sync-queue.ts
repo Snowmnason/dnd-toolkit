@@ -26,7 +26,7 @@ import { CONSENT_SYNC_DEFAULTS } from '@/config';
 import { logger } from '@/lib/utils/logger';
 import { STORAGE_KEYS } from "@/maps";
 import { loadAnalyticsQueueJSON, persistAnalyticsQueueJSON } from "@/middleware/storage";
-import type { ConsentLevel } from './consent';
+import type { ConsentLevel } from '@/type-definitions/analytics-types';
 
 /**
  * A pending consent sync item
@@ -83,7 +83,7 @@ class ConsentSyncQueueService {
    * Initialize the queue from storage
    * Call once on app startup
    * 
-   * Loads persisted queue items and triggers processQueue() if there are pending items
+   * Loads persisted queue items and schedules retry processing if there are pending items
    * ready for retry.
    */
   async initialize(): Promise<void> {
@@ -98,9 +98,9 @@ class ConsentSyncQueueService {
 
       if (Array.isArray(stored)) {
         this.queue = stored;
-          logger
-            .category('analytics')
-            .analytics(`Loaded ${this.queue.length} pending consent syncs from storage`);
+        logger
+          .category('analytics')
+          .analytics(`Loaded ${this.queue.length} pending consent syncs from storage`);
         
         // If there are pending items, schedule a retry check
         if (this.queue.length > 0) {
@@ -110,8 +110,8 @@ class ConsentSyncQueueService {
       this.isInitialized = true;
     } catch (error) {
       logger
-      .category('analytics')
-      .error('Failed to initialize consent sync queue from storage', { error });
+        .category('analytics')
+        .error('Failed to initialize consent sync queue from storage', { error });
       this.isInitialized = true; // Don't block app startup
     }
   }
@@ -386,7 +386,7 @@ class ConsentSyncQueueService {
         this.lastNetworkOnlineTime = now;
         logger
           .category('analytics')
-          .info('ConsentSyncQueue', 'Online transition detected, triggering auto-process');
+          .debug('ConsentSyncQueue', 'Online transition detected, triggering auto-process');
 
         // Process in background (non-blocking)
         this.processQueue().catch((err) => {
@@ -399,7 +399,7 @@ class ConsentSyncQueueService {
       wasOnline = isOnline;
     });
 
-    logger.category('analytics').info('ConsentSyncQueue', 'NetworkDetection hook installed');
+    logger.category('analytics').debug('ConsentSyncQueue', 'NetworkDetection hook installed');
   }
 
   /**
@@ -411,7 +411,7 @@ class ConsentSyncQueueService {
       this.networkUnsubscribe = null;
       logger
         .category('analytics')
-        .analytics('ConsentSyncQueue', 'NetworkDetection hook removed');
+        .debug('ConsentSyncQueue', 'NetworkDetection hook removed');
     }
 
     // Also clear retry timeout

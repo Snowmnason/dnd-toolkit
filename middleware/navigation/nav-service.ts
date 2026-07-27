@@ -18,8 +18,8 @@
  *   5. Strips transaction metadata before returning to lib
  */
 
-import { NavAnalytics } from '@/lib/analytics/modules/nav-analytics';
 import { logger } from '@/lib/utils';
+import { NavigationManager } from '@/managers/navigation/navigationManager';
 import {
   executeExternalTransitionNav,
   executeHistoryTransitionNav,
@@ -81,7 +81,7 @@ function fireAnalytics(
   analytics?: NavAnalyticsContext,
 ): void {
   try {
-    NavAnalytics.trackNavigationResult({
+    NavigationManager.trackNavigationResult({
       result,
       target,
       fromRoute: analytics?.fromRoute,
